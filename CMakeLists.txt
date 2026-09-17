@@ -36,7 +36,7 @@ include(FetchContent)
 FetchContent_Declare(
     vk_bootstrap
     GIT_REPOSITORY https://github.com/charles-lunarg/vk-bootstrap
-    GIT_TAG        main # Or a specific tag release
+    GIT_TAG 9064ea7213ed160e9793eacc39ee68d957b55fad
 )
 FetchContent_MakeAvailable(vk_bootstrap)
 
@@ -44,14 +44,10 @@ add_executable(rndr)
 target_sources(rndr
     PRIVATE
         src/rndr_main.cpp
-    PRIVATE
-        FILE_SET SOURCES
-        BASE_DIRS src
-        FILES
-            src/application.cpp
-            src/multithreading.cpp
-            src/window.cpp
-            src/vulkan.cpp
+        src/application.cpp
+        src/multithreading.cpp
+        src/window.cpp
+        src/vulkan.cpp
     PRIVATE
         FILE_SET HEADERS
         BASE_DIRS include
