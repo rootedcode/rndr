@@ -1,0 +1,8 @@
+{
+    "clangd.arguments": [
+        "--experimental-modules-support",
+        "--background-index",
+        "--compile-commands-dir=${workspaceFolder}/build",
+        "--query-driver=clang++"
+    ],
+}
