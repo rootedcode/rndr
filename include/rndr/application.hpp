@@ -21,7 +21,6 @@ public:
     Application(const Application&) = delete;
     Application& operator=(const Application&) = delete;
 
-    void Initialize();
     void Run();
 
     template <typename Function, typename... Args>

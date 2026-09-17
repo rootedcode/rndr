@@ -1,3 +1,4 @@
+#include "VkBootstrap.h"
 #include <rndr/vulkan.hpp>
 #include <vulkan/vulkan_core.h>
 
@@ -75,41 +76,52 @@ VulkanEngine::VulkanEngine(GLFWwindow* window) : window(window) {
 };
 
 VulkanEngine::~VulkanEngine() {
-    if (this->isInitialized) {
+    if (this->device != VK_NULL_HANDLE) {
         vkDeviceWaitIdle(this->device);
-        this->destroy_framebuffers();
-        if (this->graphics_pipeline != VK_NULL_HANDLE) {
-            vkDestroyPipeline(this->device, this->graphics_pipeline, nullptr);
-            this->graphics_pipeline = VK_NULL_HANDLE;
-        }
-        if (this->pipeline_layout != VK_NULL_HANDLE) {
-            vkDestroyPipelineLayout(this->device, this->pipeline_layout, nullptr);
-            this->pipeline_layout = VK_NULL_HANDLE;
-        }
-        if (this->render_pass != VK_NULL_HANDLE) {
-            vkDestroyRenderPass(this->device, this->render_pass, nullptr);
-            this->render_pass = VK_NULL_HANDLE;
-        }
-        this->destroy_sync_structures();
-
-        for (const auto& frame : this->frames) {
-            vkDestroyFence(this->device, frame.render_fence, nullptr);
-            vkDestroyCommandPool(this->device, frame.command_pool, nullptr);
-        }
-
-        this->destroy_swapchain();
-        vkDestroySurfaceKHR(this->instance, this->surface, nullptr);
-        vkDestroyDevice(this->device, nullptr);
-        vkb::destroy_debug_utils_messenger(this->instance, this->debug_messenger);
-        vkDestroyInstance(this->instance, nullptr);
     }
+    if (!this->framebuffers.empty()) {
+        this->destroy_framebuffers();
+    }
+    if (this->graphics_pipeline != VK_NULL_HANDLE) {
+        vkDestroyPipeline(this->device, this->graphics_pipeline, nullptr);
+        this->graphics_pipeline = VK_NULL_HANDLE;
+    }
+    if (this->pipeline_layout != VK_NULL_HANDLE) {
+        vkDestroyPipelineLayout(this->device, this->pipeline_layout, nullptr);
+        this->pipeline_layout = VK_NULL_HANDLE;
+    }
+    if (this->render_pass != VK_NULL_HANDLE) {
+        vkDestroyRenderPass(this->device, this->render_pass, nullptr);
+        this->render_pass = VK_NULL_HANDLE;
+    }
+    
+    this->destroy_sync_structures();
+
+    for (const auto& frame : this->frames) {
+        vkDestroyFence(this->device, frame.render_fence, nullptr);
+        vkDestroyCommandPool(this->device, frame.command_pool, nullptr);
+    }
+
+    this->destroy_swapchain();
+    vkDestroySurfaceKHR(this->instance, this->surface, nullptr);
+    vkDestroyDevice(this->device, nullptr);
+    vkb::destroy_debug_utils_messenger(this->instance, this->debug_messenger);
+    vkDestroyInstance(this->instance, nullptr);
     this->isInitialized = false;
 }
 
 void VulkanEngine::init_vulkan() {
-    vkb::InstanceBuilder builder;
 
-    auto vkb_build = builder.set_app_name("Example Vulkan Application")
+    uint32_t extension_count = 0;
+    const char** glfw_extensions = glfwGetRequiredInstanceExtensions(&extension_count);
+    if (glfw_extensions == nullptr) {
+        throw std::runtime_error("glfw: failed to get required instance extensions.");
+    }
+
+    vkb::InstanceBuilder builder;
+    auto vkb_build = builder
+        .set_app_name("Example Vulkan Application")
+        .enable_extensions(extension_count, glfw_extensions)
         .request_validation_layers(use_validation_layers)
         .use_default_debug_messenger()
         .require_api_version(1, 4, 0)
@@ -154,10 +166,15 @@ void VulkanEngine::init_vulkan() {
 
     this->graphics_queue = vkb_device.get_queue(vkb::QueueType::graphics).value();
     this->graphics_queue_family = vkb_device.get_queue_index(vkb::QueueType::graphics).value();
+    this->present_queue = vkb_device.get_queue(vkb::QueueType::present).value();
+    this->present_queue_family = vkb_device.get_queue_index(vkb::QueueType::present).value();
 }
 
 void VulkanEngine::init_swapchain() {
-    this->create_swapchain(1280, 720);
+    int width = 0;
+    int height = 0;
+    glfwGetFramebufferSize(this->window, &width, &height);
+    this->create_swapchain(width, height);
 };
 
 void VulkanEngine::create_swapchain(uint32_t width, uint32_t height) {
@@ -169,12 +186,12 @@ void VulkanEngine::create_swapchain(uint32_t width, uint32_t height) {
         .set_desired_format(VkSurfaceFormatKHR{ .format = this->swapchain_image_format, .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR })
         .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
         .set_desired_extent(width, height)
-        .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
         .build()
         .value();
 
         this->swapchainExtent = vkb_swapchain.extent;
         this->swapchain = vkb_swapchain.swapchain;
+        this->swapchain_image_format = vkb_swapchain.image_format;
         this->swapchain_images = vkb_swapchain.get_images().value();
         this->swapchain_image_views = vkb_swapchain.get_image_views().value();
     
@@ -454,8 +471,7 @@ void VulkanEngine::Draw_frames() {
     auto& frame = this->frames[frame_index];
 
     vkWaitForFences(this->device, 1, &frame.render_fence, VK_TRUE, UINT64_MAX);
-    vkResetFences(this->device, 1, &frame.render_fence);
-
+    
     const VkSemaphore image_available_semaphore = this->image_available_semaphores[frame_index];
     uint32_t swapchain_image_index = 0;
     VkResult acquire_result = vkAcquireNextImageKHR(
@@ -466,6 +482,7 @@ void VulkanEngine::Draw_frames() {
         VK_NULL_HANDLE,
         &swapchain_image_index
     );
+    
     if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR || acquire_result == VK_SUBOPTIMAL_KHR) {
         this->recreate_swapchain();
         return;
@@ -473,7 +490,8 @@ void VulkanEngine::Draw_frames() {
     if (acquire_result != VK_SUCCESS) {
         throw std::runtime_error("Failed to acquire swapchain image.");
     }
-
+    
+    vkResetFences(this->device, 1, &frame.render_fence);
     vkResetCommandBuffer(frame.command_buffer, 0);
     VkCommandBufferBeginInfo begin_info{ .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT };
     if (vkBeginCommandBuffer(frame.command_buffer, &begin_info) != VK_SUCCESS) {
@@ -519,7 +537,7 @@ void VulkanEngine::Draw_frames() {
     present_info.swapchainCount = 1;
     present_info.pSwapchains = swapchains;
     present_info.pImageIndices = &swapchain_image_index;
-    VkResult present_result = vkQueuePresentKHR(this->graphics_queue, &present_info);
+    VkResult present_result = vkQueuePresentKHR(this->present_queue, &present_info);
     if (present_result == VK_ERROR_OUT_OF_DATE_KHR || present_result == VK_SUBOPTIMAL_KHR) {
         this->recreate_swapchain();
         return;

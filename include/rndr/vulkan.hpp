@@ -40,6 +40,7 @@ private:
     std::vector<VkImageView> swapchain_image_views;
     VkExtent2D swapchainExtent{};
     VkQueue graphics_queue = VK_NULL_HANDLE;
+    VkQueue present_queue = VK_NULL_HANDLE;
     std::vector<FrameData> frames;
     std::vector<VkFramebuffer> framebuffers;
     VkRenderPass render_pass = VK_NULL_HANDLE;
@@ -48,6 +49,7 @@ private:
     std::vector<VkSemaphore> image_available_semaphores;
     std::vector<VkSemaphore> render_finished_semaphores;
     uint32_t graphics_queue_family = 0;
+    uint32_t present_queue_family = 0;
     uint32_t current_frame = 0;
 
     void init_vulkan();
