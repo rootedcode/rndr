@@ -58,6 +58,8 @@ target_sources(rndr
             include/rndr/vulkan.hpp
 )
 
+target_include_directories(rndr PRIVATE include)
+
 target_link_libraries(rndr
     PRIVATE
         glfw
