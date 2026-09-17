@@ -43,12 +43,12 @@ public:
     }
 
 private:
-    void worker_loop(std::stop_token stop_token);
-
-    std::vector<std::jthread> workers;
     std::queue<std::function<void()>> tasks;
-
     std::mutex queue_mutex;
     std::condition_variable cv;
     bool stop = false;
+
+    std::vector<std::jthread> workers;
+
+    void worker_loop(std::stop_token stop_token);
 };

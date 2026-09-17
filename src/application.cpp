@@ -15,13 +15,7 @@ void Application::initialize_window_and_vulkan(size_t window_width, size_t windo
 
 Application::Application(size_t window_width, size_t window_height, std::string window_title) : 
     window(window_width, window_height, window_title),
-    threads(std::nullopt) {
-    initialize_window_and_vulkan(window_width, window_height, window_title);
-}
-
-Application::Application(size_t window_width, size_t window_height, std::string window_title, size_t num_of_threads) : 
-    window(window_width, window_height, window_title),
-    threads(std::make_optional<ThreadPool>(num_of_threads)) {
+    threads(std::make_optional<ThreadPool>(std::thread::hardware_concurrency())) {
     initialize_window_and_vulkan(window_width, window_height, window_title);
 }
 

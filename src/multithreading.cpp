@@ -5,6 +5,9 @@
 #include <rndr/multithreading.hpp>
 
 ThreadPool::ThreadPool(size_t num_threads) {
+    if (num_threads == 0) {
+        throw std::invalid_argument("ThreadPool: number of threads must be greater than zero.");
+    }
     workers.reserve(num_threads);
     for (size_t i = 0; i < num_threads; ++i) {
         workers.emplace_back([this](std::stop_token stop_token) {
