@@ -1,3 +1,5 @@
+#include <functional>
+#include <memory>
 #include <print>
 #include <thread>
 
@@ -12,7 +14,7 @@ int main() {
 
     for (size_t i = 0; i < std::thread::hardware_concurrency(); i++) {
         app->QueueTask([] {
-            std::println("Hello, from thread {}!", std::this_thread::get_id());
+            std::println("Hello, from thread {}!", std::hash<std::thread::id>{}(std::this_thread::get_id()));
         });
     }
 

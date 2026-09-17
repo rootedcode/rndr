@@ -10,7 +10,7 @@ constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 struct FrameData {
     VkCommandPool command_pool = VK_NULL_HANDLE;
     VkCommandBuffer command_buffer = VK_NULL_HANDLE;
-    VkSemaphore swapchain_sempaphore = VK_NULL_HANDLE;
+    VkSemaphore swapchain_semaphore = VK_NULL_HANDLE;
     VkSemaphore render_semaphore = VK_NULL_HANDLE;
     VkFence render_fence = VK_NULL_HANDLE;
 };
@@ -65,5 +65,6 @@ private:
     void create_swapchain(uint32_t width, uint32_t height);
     void recreate_swapchain();
     void destroy_swapchain();
+    void cleanup() noexcept;
 
 };

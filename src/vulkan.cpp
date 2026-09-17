@@ -64,49 +64,83 @@ VkShaderModule create_shader_module(VkDevice device, const std::string& shader_n
 }
 
 VulkanEngine::VulkanEngine(GLFWwindow* window) : window(window) {
-    this->init_vulkan();
-    this->init_swapchain();
-    this->frames.resize(MAX_FRAMES_IN_FLIGHT);
-    this->init_commands();
-    this->init_sync_structures();
-    this->create_render_pass();
-    this->create_graphics_pipeline();
-    this->create_framebuffers();
-    isInitialized = true;
+    try {
+        this->init_vulkan();
+        this->init_swapchain();
+        this->frames.resize(MAX_FRAMES_IN_FLIGHT);
+        this->init_commands();
+        this->init_sync_structures();
+        this->create_render_pass();
+        this->create_graphics_pipeline();
+        this->create_framebuffers();
+        this->isInitialized = true;
+    } catch (...) {
+        this->cleanup();
+        throw;
+    }
 };
 
 VulkanEngine::~VulkanEngine() {
+    this->cleanup();
+}
+
+void VulkanEngine::cleanup() noexcept {
     if (this->device != VK_NULL_HANDLE) {
         vkDeviceWaitIdle(this->device);
     }
-    if (!this->framebuffers.empty()) {
+
+    if (this->device != VK_NULL_HANDLE && !this->framebuffers.empty()) {
         this->destroy_framebuffers();
     }
-    if (this->graphics_pipeline != VK_NULL_HANDLE) {
+    if (this->graphics_pipeline != VK_NULL_HANDLE && this->device != VK_NULL_HANDLE) {
         vkDestroyPipeline(this->device, this->graphics_pipeline, nullptr);
         this->graphics_pipeline = VK_NULL_HANDLE;
     }
-    if (this->pipeline_layout != VK_NULL_HANDLE) {
+    if (this->pipeline_layout != VK_NULL_HANDLE && this->device != VK_NULL_HANDLE) {
         vkDestroyPipelineLayout(this->device, this->pipeline_layout, nullptr);
         this->pipeline_layout = VK_NULL_HANDLE;
     }
-    if (this->render_pass != VK_NULL_HANDLE) {
+    if (this->render_pass != VK_NULL_HANDLE && this->device != VK_NULL_HANDLE) {
         vkDestroyRenderPass(this->device, this->render_pass, nullptr);
         this->render_pass = VK_NULL_HANDLE;
     }
     
-    this->destroy_sync_structures();
-
-    for (const auto& frame : this->frames) {
-        vkDestroyFence(this->device, frame.render_fence, nullptr);
-        vkDestroyCommandPool(this->device, frame.command_pool, nullptr);
+    if (this->device != VK_NULL_HANDLE) {
+        this->destroy_sync_structures();
+    } else {
+        this->image_available_semaphores.clear();
+        this->render_finished_semaphores.clear();
     }
 
-    this->destroy_swapchain();
-    vkDestroySurfaceKHR(this->instance, this->surface, nullptr);
-    vkDestroyDevice(this->device, nullptr);
-    vkb::destroy_debug_utils_messenger(this->instance, this->debug_messenger);
-    vkDestroyInstance(this->instance, nullptr);
+    for (const auto& frame : this->frames) {
+        if (this->device != VK_NULL_HANDLE && frame.render_fence != VK_NULL_HANDLE) {
+            vkDestroyFence(this->device, frame.render_fence, nullptr);
+        }
+        if (this->device != VK_NULL_HANDLE && frame.command_pool != VK_NULL_HANDLE) {
+            vkDestroyCommandPool(this->device, frame.command_pool, nullptr);
+        }
+    }
+    this->frames.clear();
+
+    if (this->device != VK_NULL_HANDLE) {
+        this->destroy_swapchain();
+    }
+    if (this->surface != VK_NULL_HANDLE && this->instance != VK_NULL_HANDLE) {
+        vkDestroySurfaceKHR(this->instance, this->surface, nullptr);
+        this->surface = VK_NULL_HANDLE;
+    }
+    if (this->device != VK_NULL_HANDLE) {
+        vkDestroyDevice(this->device, nullptr);
+        this->device = VK_NULL_HANDLE;
+    }
+    if (this->debug_messenger != VK_NULL_HANDLE && this->instance != VK_NULL_HANDLE) {
+        vkb::destroy_debug_utils_messenger(this->instance, this->debug_messenger);
+        this->debug_messenger = VK_NULL_HANDLE;
+    }
+    if (this->instance != VK_NULL_HANDLE) {
+        vkDestroyInstance(this->instance, nullptr);
+        this->instance = VK_NULL_HANDLE;
+    }
     this->isInitialized = false;
 }
 
@@ -132,9 +166,8 @@ void VulkanEngine::init_vulkan() {
     instance = vkb_instance.instance;
     debug_messenger = vkb_instance.debug_messenger;
 
-    glfwCreateWindowSurface(instance, this->window, nullptr, &this->surface);
-
-    if (this->surface == VK_NULL_HANDLE) {
+    const VkResult surface_result = glfwCreateWindowSurface(instance, this->window, nullptr, &this->surface);
+    if (surface_result != VK_SUCCESS) {
         throw std::runtime_error("Failed to create window surface.");
     }
     
@@ -281,9 +314,23 @@ void VulkanEngine::recreate_swapchain() {
 
     vkDeviceWaitIdle(this->device);
     this->destroy_framebuffers();
+    if (this->graphics_pipeline != VK_NULL_HANDLE) {
+        vkDestroyPipeline(this->device, this->graphics_pipeline, nullptr);
+        this->graphics_pipeline = VK_NULL_HANDLE;
+    }
+    if (this->pipeline_layout != VK_NULL_HANDLE) {
+        vkDestroyPipelineLayout(this->device, this->pipeline_layout, nullptr);
+        this->pipeline_layout = VK_NULL_HANDLE;
+    }
+    if (this->render_pass != VK_NULL_HANDLE) {
+        vkDestroyRenderPass(this->device, this->render_pass, nullptr);
+        this->render_pass = VK_NULL_HANDLE;
+    }
     this->destroy_sync_structures();
     this->destroy_swapchain();
     this->create_swapchain(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+    this->create_render_pass();
+    this->create_graphics_pipeline();
     this->init_sync_structures();
     this->create_framebuffers();
 }

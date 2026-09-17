@@ -3,6 +3,7 @@
 #include <condition_variable>
 #include <functional>
 #include <future>
+#include <memory>
 #include <mutex>
 #include <queue>
 #include <stdexcept>
@@ -13,7 +14,7 @@
 
 class ThreadPool {
 public:
-    explicit ThreadPool(size_t num_threads = std::thread::hardware_concurrency());
+    explicit ThreadPool(size_t num_threads = (std::thread::hardware_concurrency() == 0 ? 1 : std::thread::hardware_concurrency()));
     ~ThreadPool();
 
     ThreadPool(const ThreadPool&) = delete;
