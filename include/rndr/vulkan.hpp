@@ -20,6 +20,9 @@ public:
     VulkanEngine(GLFWwindow* window);
     ~VulkanEngine();
 
+    VulkanEngine(const VulkanEngine&) = delete;
+    VulkanEngine& operator=(const VulkanEngine&) = delete;
+
     void Draw_frames();
 
 private:

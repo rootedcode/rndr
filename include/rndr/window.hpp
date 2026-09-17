@@ -12,6 +12,9 @@ public:
     Window(size_t width, size_t height, std::string title);
     ~Window();
 
+    Window(const Window&) = delete;
+    Window& operator=(const Window&) = delete;
+
     void CreateWindow(size_t width, size_t height, std::string title);
     void DestroyWindow();
     void Run(std::atomic<bool>& shouldRun);
